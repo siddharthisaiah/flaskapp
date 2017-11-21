@@ -58,9 +58,51 @@ def register():
         name = form.name.data
         email = form.email.data
         username = form.username.data
-        password = form.password.data
+        password = sha256_crypt.encrypt(str(form.password.data))
+
+        # create cursor
+        cur = mysql.connection.cursor()
+        # execute query
+        cur.execute("INSERT INTO users(rname, email, username, passwd) VALUES(%s, %s, %s, %s)", (name, email, username, password))
+        # commit to bd
+        mysql.connection.commit()
+
+        # close connection
+        cur.close()
+
+        flash("You are now registered and can log in", "success")
+        return redirect(url_for('index'))
+
     return render_template('register.html', form=form)
 
 
+# User login
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        # get form fields
+        username = request.form['username']
+        password_candidate = request.form['password']
+
+        # Create cursor
+        cur = mysql.connection.cursor()
+
+        # Get user by username
+        result = cur.execute("SELECT * FROM users WHERE username = %s", [username])
+
+        if result > 0:
+            # Get stored hash
+            data = cur.fetchone()
+            password = data['passwd']
+            # Compare passwords
+            if sha256_crypt.verify(password_candidate, password):
+                app.logger.info("PASSWORD MATCHED")
+        else:
+            app.logger.info("NO USER")
+
+    return render_template('login.html')
+
+
 if __name__ == "__main__":
+    app.secret_key = 'secret123'
     app.run()
